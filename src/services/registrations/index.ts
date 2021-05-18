@@ -2,10 +2,11 @@ import Web3 from 'web3';
 import { Harmony } from '@harmony-js/core';
 import { Messenger, HttpProvider } from '@harmony-js/network';
 import { ChainType, ChainID } from '@harmony-js/utils';
-import { DBService } from '../database';
-import { eventLogs, RegisterContractAbi } from './helpers';
 import { hash } from 'eth-ens-namehash';
 import moment = require('moment');
+
+import { DBService } from '../database';
+import { eventLogs, RegisterContractAbi } from './helpers';
 import { manualOperations } from './manual_operations';
 
 export interface IRegistrationService {
@@ -164,11 +165,18 @@ export class RegistrationService {
   getAllRegistrations = (params: { search?: string; size: number; page: number }) => {
     const filteredData = this.registrations.filter(log => {
       if (params.search) {
-        return (
-          log.domain.includes(params.search) ||
-          log.owner.includes(params.search) ||
-          log.twitter.includes(params.search)
-        );
+        if (log.domain.includes(params.search) || log.twitter.includes(params.search)) return true;
+
+        try {
+          const searchAddress = this.hmy.crypto.getAddress(params.search).checksumm;
+
+          return (
+            this.hmy.crypto.getAddress(log.owner).checksumm === searchAddress ||
+            this.hmy.crypto.getAddress(log.from).checksumm === searchAddress
+          );
+        } catch (e) {}
+
+        return false;
       }
 
       return true;
