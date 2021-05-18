@@ -13,4 +13,13 @@ export const routes = (app, services: IServices) => {
       return res.json(data);
     })
   );
+
+  app.get(
+    '/stats',
+    asyncHandler(async (req, res) => {
+      const data = await services.registrations.getStats();
+
+      return res.json(data);
+    })
+  );
 };

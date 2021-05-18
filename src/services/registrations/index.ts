@@ -6,6 +6,7 @@ import { DBService } from '../database';
 import { eventLogs, RegisterContractAbi } from './helpers';
 import { hash } from 'eth-ens-namehash';
 import moment = require('moment');
+import { manualOperations } from './manual_operations';
 
 export interface IRegistrationService {
   database: DBService;
@@ -88,7 +89,7 @@ export class RegistrationService {
           },
         ]);
 
-        const logs: IRegistration[] = await Promise.all(
+        let logs: IRegistration[] = await Promise.all(
           logsRes.result.map(async log => {
             try {
               const decoded = this.web3.eth.abi.decodeLog(eventLogs, log.data, log.topics.slice(1));
@@ -103,11 +104,13 @@ export class RegistrationService {
 
               const domainName = decoded.subdomain;
 
-              // if (res.result.from === 'one1lhvxtynwpsq3kjexg6qgd06stta8hr4ll95zce') {
-              //   return null;
-              // }
+              if (res.result.from === 'one1lhvxtynwpsq3kjexg6qgd06stta8hr4ll95zce') {
+                return null;
+              }
 
-              const manualRecord = null; // arr.find(a => !!a.status && a.domain === domainName);
+              const manualRecord = manualOperations.find(
+                a => !!a.status && a.domain === domainName
+              );
 
               const rec: IRegistration = {
                 from: res.result.from,
@@ -126,6 +129,8 @@ export class RegistrationService {
             }
           })
         );
+
+        logs = logs.filter(l => !!l);
 
         this.registrations = this.registrations.concat(logs);
 
@@ -150,41 +155,24 @@ export class RegistrationService {
     );
   };
 
+  getStats = () => {
+    return {
+      total: this.registrations.length,
+    };
+  };
+
   getAllRegistrations = (params: { search?: string; size: number; page: number }) => {
-    const filteredData = this.registrations;
-    // const filteredData = this.registrations
-    //   .filter(o => true)
-    //   .filter(log => {
-    //     const hasEthAddress = params.ethAddress ? params.ethAddress === operation.ethAddress : true;
-    //     const hasOneAddress = params.oneAddress ? params.oneAddress === operation.oneAddress : true;
-    //     const hasStatus = params.status ? params.status === operation.status : true;
-    //     const hasType = params.type ? params.type === operation.type : true;
-    //     const hasNetwork = params.network ? params.network === operation.network : true;
-    //     const hasToken = params.token ? params.token === operation.token : true;
-    //     const hasAmount = params.amount ? params.amount === operation.amount : true;
-    //     const hasTransaction = params.transactionHash
-    //       ? operation.actions.some(
-    //           a =>
-    //             a.transactionHash &&
-    //             a.transactionHash.toLowerCase() === params.transactionHash.toLowerCase()
-    //         )
-    //       : true;
-    //
-    //     const hasSearch = params.search ? searchInOperation(params.search, operation) : true;
-    //
-    //     return (
-    //       hasEthAddress &&
-    //       hasOneAddress &&
-    //       hasNetwork &&
-    //       hasStatus &&
-    //       hasType &&
-    //       hasToken &&
-    //       hasAmount &&
-    //       hasSearch &&
-    //       hasTransaction &&
-    //       (params.stuck ? this.checkToStuck(operation) : true)
-    //     );
-    //   });
+    const filteredData = this.registrations.filter(log => {
+      if (params.search) {
+        return (
+          log.domain.includes(params.search) ||
+          log.owner.includes(params.search) ||
+          log.twitter.includes(params.search)
+        );
+      }
+
+      return true;
+    });
 
     const sortedData = filteredData.sort((a, b) => {
       return moment(a.timestamp * 1000).isBefore(b.timestamp * 1000) ? 1 : -1;
