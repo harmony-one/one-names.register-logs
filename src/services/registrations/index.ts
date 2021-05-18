@@ -158,7 +158,7 @@ export class RegistrationService {
 
   getStats = () => {
     return {
-      total: this.registrations.length,
+      totalRegistered: this.registrations.length,
       totalFundsRaised: this.registrations.reduce((acc, log) => acc + Number(log.price), 0),
     };
   };
