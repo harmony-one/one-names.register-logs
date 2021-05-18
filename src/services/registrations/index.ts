@@ -168,13 +168,15 @@ export class RegistrationService {
         if (log.domain.includes(params.search) || log.twitter.includes(params.search)) return true;
 
         try {
-          const searchAddress = this.hmy.crypto.getAddress(params.search).checksumm;
+          const searchAddress = this.hmy.crypto.getAddress(params.search).checksum;
 
           return (
-            this.hmy.crypto.getAddress(log.owner).checksumm === searchAddress ||
-            this.hmy.crypto.getAddress(log.from).checksumm === searchAddress
+            this.hmy.crypto.getAddress(log.owner).checksum === searchAddress ||
+            this.hmy.crypto.getAddress(log.from).checksum === searchAddress
           );
-        } catch (e) {}
+        } catch (e) {
+          // console.log(e);
+        }
 
         return false;
       }
