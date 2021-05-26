@@ -6,11 +6,17 @@ import { hash } from 'eth-ens-namehash';
 import moment = require('moment');
 
 import { DBService } from '../database';
-import { eventLogs, RegisterContractAbi } from './helpers';
 import { manualOperations } from './manual_operations';
 
 export interface IRegistrationService {
   database: DBService;
+  dbCollectionName: string;
+  contractAddress: string;
+  contractAbi: any;
+  eventLogs: any;
+  lastBlock: number;
+  eventName: string;
+  subDomain: boolean;
 }
 
 export interface IRegistration {
@@ -33,12 +39,18 @@ export class RegistrationService {
 
   registrations: IRegistration[] = [];
 
-  lastBlock = Number(process.env.START_BLOCK) || 12627019;
+  lastBlock = 12627019;
+  contractAddress = '';
+
   blocksInterval = Number(process.env.BLOCKS_INTERVAL) || 30000;
   waitInterval = Number(process.env.WAIT_INTERVAL) || 1000;
-  contractAddress = process.env.CONTRACT || '0x43B2b112ef03725B5FD42e3ad9b7f2d857ed4642';
   cacheLimit = Number(process.env.CACHE_LIMIT) || 10000;
   topicAddress = '';
+
+  contractAbi = [];
+  eventLogs = [];
+  eventName = '';
+  subDomain = false;
 
   web3: Web3;
   hmy: Harmony;
@@ -60,9 +72,17 @@ export class RegistrationService {
       }
     );
 
-    this.contract = this.hmy.contracts.createContract(RegisterContractAbi, this.contractAddress);
+    this.dbCollectionName = params.dbCollectionName;
+    this.contractAddress = params.contractAddress;
+    this.lastBlock = params.lastBlock;
+    this.contractAbi = params.contractAbi;
+    this.eventLogs = params.eventLogs;
+    this.eventName = params.eventName;
+    this.subDomain = params.subDomain;
 
-    this.topicAddress = this.contract.abiModel.getEvent('NewRegistration').signature;
+    this.contract = this.hmy.contracts.createContract(this.contractAbi, this.contractAddress);
+
+    this.topicAddress = this.contract.abiModel.getEvent(this.eventName).signature;
 
     this.init();
   }
@@ -93,25 +113,31 @@ export class RegistrationService {
         let logs: IRegistration[] = await Promise.all(
           logsRes.result.map(async log => {
             try {
-              const decoded = this.web3.eth.abi.decodeLog(eventLogs, log.data, log.topics.slice(1));
+              const decoded = this.web3.eth.abi.decodeLog(
+                this.eventLogs,
+                log.data,
+                log.topics.slice(1)
+              );
 
               const res = await this.hmy.blockchain.getTransactionByHash({
                 txnHash: log.transactionHash,
               });
 
-              const twitter = await this.contract.methods
-                .twitter(hash(`${decoded.subdomain}.crazy.one`))
-                .call({ gasLimit: 6721900, gasPrice: 10000 });
+              let twitter, manualRecord;
 
               const domainName = decoded.subdomain;
 
-              if (res.result.from === 'one1lhvxtynwpsq3kjexg6qgd06stta8hr4ll95zce') {
-                return null;
-              }
+              if (!!this.subDomain) {
+                twitter = await this.contract.methods
+                  .twitter(hash(`${decoded.subdomain}.crazy.one`))
+                  .call({ gasLimit: 6721900, gasPrice: 10000 });
 
-              const manualRecord = manualOperations.find(
-                a => !!a.status && a.domain === domainName
-              );
+                if (res.result.from === 'one1lhvxtynwpsq3kjexg6qgd06stta8hr4ll95zce') {
+                  return null;
+                }
+
+                manualRecord = manualOperations.find(a => !!a.status && a.domain === domainName);
+              }
 
               const rec: IRegistration = {
                 from: res.result.from,
