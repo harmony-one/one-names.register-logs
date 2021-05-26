@@ -192,7 +192,11 @@ export class RegistrationService {
   getAllRegistrations = (params: { search?: string; size: number; page: number }) => {
     const filteredData = this.registrations.filter(log => {
       if (params.search) {
-        if (log.domain.includes(params.search) || log.twitter.includes(params.search)) return true;
+        if (
+          log.domain.includes(params.search) ||
+          (log.twitter && log.twitter.includes(params.search))
+        )
+          return true;
 
         try {
           const searchAddress = this.hmy.crypto.getAddress(params.search).checksum;
